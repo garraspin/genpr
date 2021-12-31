@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# Usage: genpr <JIRA-TICKET-NUMBER>
+
+[ -z "$GENPR_JIRA_USER" ] && echo "GENPR_JIRA_USER env var not found" && exit 1
+[ -z "$GENPR_JIRA_TOKEN" ] && echo "GENPR_JIRA_TOKEN env var not found" && exit 1
+[ -z "$GENPR_JIRA_BASE" ] && echo "GENPR_JIRA_BASE env var not found" && exit 1
+[ -z "$GENPR_GITHUB_BASE" ] && echo "GENPR_GITHUB_BASE env var not found" && exit 1
+ticket=$1
+[ -z "$ticket" ] && echo "Ticket number is mandatory" && exit 2
+
+summary=$(curl --user "$GENPR_JIRA_USER":"$GENPR_JIRA_TOKEN" -H "Content-Type: application/json" $GENPR_JIRA_BASE/rest/api/2/search\?jql=key="$ticket" | jq -r '.issues[].fields.summary')
+if [ $? -eq 0 ];
+then
+    commitMsg="$ticket: $summary"
+else
+    echo "Jira ticket not found" && exit 3
+fi
+
+git checkout -b $ticket && git add . && git commit -m "$commitMsg" && git push --set-upstream origin $ticket
+
+if [ $? -ne 0 ];
+then
+    echo "Git failed" && exit 4
+fi
+
+open $GENPR_GITHUB_BASE/${PWD##*/}/pull/new/$ticket
